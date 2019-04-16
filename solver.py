@@ -281,7 +281,7 @@ class Solver(object):
                 x_fake = self.G(x_real, c_trg)
                 out_src, out_cls = self.D(x_fake)
                 ####################################################################
-                ssim_loss=ssim(x_fake, y_trg,window_size=8)
+                #ssim_loss=ssim(x_fake, y_trg,window_size=8)
 
                 g_loss_fake = - torch.mean(out_src)
                 g_loss_cls = self.classification_loss(out_cls, y_char, self.dataset)
@@ -291,7 +291,7 @@ class Solver(object):
                 g_loss_rec = torch.mean(torch.abs(x_real - x_reconst))
 
                 # Backward and optimize.
-                g_loss = g_loss_fake + self.lambda_rec * g_loss_rec + self.lambda_cls * g_loss_cls-5*ssim_loss
+                g_loss = g_loss_fake + self.lambda_rec * g_loss_rec + self.lambda_cls * g_loss_cls#-5*ssim_loss
                 self.reset_grad()
                 g_loss.backward()
                 self.g_optimizer.step()
@@ -343,6 +343,57 @@ class Solver(object):
                 d_lr -= (self.d_lr / float(self.num_iters_decay))
                 self.update_lr(g_lr, d_lr)
                 print ('Decayed learning rates, g_lr: {}, d_lr: {}.'.format(g_lr, d_lr))
+
+
+    def train1(self):
+        """Train StarGAN within a single dataset."""
+        # Set data loader.
+        if self.dataset == 'CelebA':
+            data_loader = self.celeba_loader
+        elif self.dataset == 'RaFD':
+            data_loader = self.rafd_loader
+
+        # Fetch fixed inputs for debugging.
+        data_iter = iter(data_loader)
+        x_fixed, x_fixed_style, x_fixed_char, y_fixed,y_fixed_style, y_fixed_char = next(data_iter)
+        x_fixed = x_fixed.to(self.device)
+        y_fixed = y_fixed.to(self.device)
+        y_fixed_char = y_fixed_char.to(self.device)
+        c_fixed_list = self.create_labels(x_fixed_char, self.c_dim, self.dataset, self.selected_attrs)
+        pdb.set_trace()
+        #pdb.set_trace()
+        # Learning rate cache for decaying.
+        g_lr = self.g_lr
+        d_lr = self.d_lr
+
+        # Start training from scratch or resume training.
+        
+        
+        start_iters = self.resume_iters
+        self.restore_model(self.resume_iters)
+
+        # Start training.
+        print('Start training...')
+        start_time = time.time()
+        for i in range(start_iters, start_iters+10):
+
+            
+
+            # Translate fixed images for debugging.
+            
+            with torch.no_grad():
+                x_fake_list = [x_fixed]
+                for c_fixed in c_fixed_list:
+                    x_fake_list.append(self.G(x_fixed, c_fixed))
+                x_concat = torch.cat(x_fake_list, dim=3)
+                sample_path = os.path.join(self.sample_dir, '{}test-images.jpg'.format(i+1))
+                save_image(self.denorm(x_concat.data.cpu()), sample_path, nrow=1, padding=0)
+                print('Saved real and fake images into {}...'.format(sample_path))
+
+            
+
+
+
 
     def train_multi(self):
         """Train StarGAN with multiple datasets."""        
@@ -555,6 +606,41 @@ class Solver(object):
                 result_path = os.path.join(self.result_dir, '{}-images.jpg'.format(i+1))
                 save_image(self.denorm(x_concat.data.cpu()), result_path, nrow=1, padding=0)
                 print('Saved real and fake images into {}...'.format(result_path))
+
+    def test1(self):
+        """Translate images using StarGAN trained on a single dataset."""
+        # Load the trained generator.
+        self.restore_model(self.test_iters)
+        
+        # Set data loader.
+        if self.dataset == 'CelebA':
+            data_loader = self.celeba_loader
+        elif self.dataset == 'RaFD':
+            data_loader = self.rafd_loader
+        with torch.no_grad():
+            for i, (x_real, x_style, x_char, y_trg, y_style, y_char) in enumerate(data_loader):
+
+                # Prepare input images and target domain labels.
+                x_real = x_real.to(self.device)
+                
+                c_rafd_list = self.create_labels(x_char, self.c_dim, 'RaFD')
+                zero_celeba = torch.zeros(x_real.size(0), self.c_dim).to(self.device)
+                zero_rafd = torch.zeros(x_real.size(0), self.c_dim).to(self.device)             # Zero vector for RaFD.
+                mask_rafd = self.label2onehot(torch.ones(x_real.size(0)), 2).to(self.device)     # Mask vector: [0, 1].
+
+                # Translate images.
+                x_fake_list = [x_real]
+                for c_rafd in c_rafd_list:
+                    c_trg = torch.cat([zero_celeba, c_rafd, mask_rafd], dim=1)
+                    x_fake_list.append(self.G(x_real, c_trg))
+
+                # Save the translated images.
+                x_concat = torch.cat(x_fake_list, dim=3)
+                result_path = os.path.join(self.result_dir, '{}-images.jpg'.format(i+1))
+                save_image(self.denorm(x_concat.data.cpu()), result_path, nrow=1, padding=0)
+                print('Saved real and fake images into {}...'.format(result_path))
+
+
 
     def test_multi(self):
         """Translate images using StarGAN trained on multiple datasets."""
