@@ -181,6 +181,13 @@ class Solver(object):
         elif dataset == 'RaFD':
             return F.cross_entropy(logit, target)
 
+    def classification_acc(self, logit, target):
+        """Compute accuracy."""
+        logit = torch.max(logit, 1)[1]
+        target = target
+        correct_prediction = (logit == target).float()
+        return torch.mean(correct_prediction)
+
     def train(self):
         """Train StarGAN within a single dataset."""
         # Set data loader.
@@ -580,32 +587,33 @@ class Solver(object):
     def test(self):
         """Translate images using StarGAN trained on a single dataset."""
         # Load the trained generator.
-        self.restore_model(self.test_iters)
-        
-        # Set data loader.
-        if self.dataset == 'CelebA':
-            data_loader = self.celeba_loader
-        elif self.dataset == 'RaFD':
-            data_loader = self.rafd_loader
-        
-        with torch.no_grad():
-            for i, (x_real, _1,c_org,_2,_3,_4) in enumerate(data_loader):
+        for ite in range(100000,210000,10000):
+            self.restore_model(ite)
+            
+            # Set data loader.
+            if self.dataset == 'CelebA':
+                data_loader = self.celeba_loader
+            elif self.dataset == 'RaFD':
+                data_loader = self.rafd_loader
+            
+            with torch.no_grad():
+                for i, (x_real, _1,c_org,_2,_3,_4) in enumerate(data_loader):
 
-                # Prepare input images and target domain labels.
-                x_real = x_real.to(self.device)
-                c_org=c_org.to(self.device)
-                c_trg_list = self.create_labels(c_org, self.c_dim, self.dataset, self.selected_attrs)
-                pdb.set_trace()
-                # Translate images.
-                x_fake_list = [x_real]
-                for c_trg in c_trg_list:
-                    x_fake_list.append(self.G(x_real, c_trg))
+                    # Prepare input images and target domain labels.
+                    x_real = x_real.to(self.device)
+                    c_org=c_org.to(self.device)
+                    c_trg_list = self.create_labels(c_org, self.c_dim, self.dataset, self.selected_attrs)
+                    
+                    # Translate images.
+                    x_fake_list = [x_real]
+                    for c_trg in c_trg_list:
+                        x_fake_list.append(self.G(x_real, c_trg))
 
-                # Save the translated images.
-                x_concat = torch.cat(x_fake_list, dim=3)
-                result_path = os.path.join(self.result_dir, '{}-images.jpg'.format(i+1))
-                save_image(self.denorm(x_concat.data.cpu()), result_path, nrow=1, padding=0)
-                print('Saved real and fake images into {}...'.format(result_path))
+                    # Save the translated images.
+                    x_concat = torch.cat(x_fake_list, dim=3)
+                    result_path = os.path.join(self.result_dir, '{}-images.jpg'.format(ite+1))
+                    save_image(self.denorm(x_concat.data.cpu()), result_path, nrow=1, padding=0)
+                    print('Saved real and fake images into {}...'.format(result_path))
 
     def test1(self):
         """Translate images using StarGAN trained on a single dataset."""
