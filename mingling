@@ -1,0 +1,3 @@
+python main.py --mode test --dataset RaFD --rafd_crop_size 128 --image_size 128 --c_dim 11 --rafd_image_dir data/ben/ --sample_dir ben/samples --log_dir ben/logs --model_save_dir ben/models --result_dir ben/results
+
+

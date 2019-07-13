@@ -3,6 +3,8 @@ import argparse
 from solver import Solver
 from data_loader import get_loader
 from torch.backends import cudnn
+import solver10
+import solver1
 
 
 def str2bool(v):
@@ -31,13 +33,16 @@ def main(config):
                                    config.celeba_crop_size, config.image_size, config.batch_size,
                                    'CelebA', config.mode, config.num_workers)
     if config.dataset in ['RaFD', 'Both']:
-        rafd_loader = get_loader(config.rafd_image_dir, None, None,
+        rafd_loader = get_loader(config.m,config.rafd_image_dir, None, None,
                                  config.rafd_crop_size, config.image_size, config.batch_size,
                                  'RaFD', config.mode, config.num_workers)
     
 
     # Solver for training and testing StarGAN.
-    solver = Solver(celeba_loader, rafd_loader, config)
+    if config.m==10:
+        solver = solver10.Solver(celeba_loader, rafd_loader, config)
+    else:
+        solver = solver1.Solver(celeba_loader, rafd_loader, config)
 
     if config.mode == 'train':
         if config.dataset in ['CelebA', 'RaFD']:
@@ -67,6 +72,7 @@ if __name__ == '__main__':
     parser.add_argument('--lambda_cls', type=float, default=1, help='weight for domain classification loss')
     parser.add_argument('--lambda_rec', type=float, default=10, help='weight for reconstruction loss')
     parser.add_argument('--lambda_gp', type=float, default=10, help='weight for gradient penalty')
+    parser.add_argument('--m', type=int, default=10, help='9 to 1')
     
     # Training configuration.
     parser.add_argument('--dataset', type=str, default='CelebA', choices=['CelebA', 'RaFD', 'Both'])

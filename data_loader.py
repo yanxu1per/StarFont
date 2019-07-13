@@ -21,10 +21,11 @@ class ImageFolder(data.Dataset):
     def __getitem__(self, index):
         """Return one image and its corresponding attribute label."""
         
-        random.seed()
-        random.shuffle(self.train_images)
+        #random.seed()
+        #random.shuffle(self.train_images)
 
         src = self.train_images[index]
+        print(index)
 
         src_char = int(src.split('_')[0][len(self.image_dir+self.mode+'/'):])
         src_style = int(src.split('_')[1][:-len(".jpg")])
@@ -48,15 +49,42 @@ class ImageFolder(data.Dataset):
         """Return the number of images."""
         return self.num_images
 
-def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=128, 
+
+class ImageFolder1(data.Dataset):
+    """Dataset class for the CelebA dataset."""
+
+    def __init__(self, image_dir, transform,mode):
+        """Initialize and preprocess the CelebA dataset."""
+        self.image_dir = image_dir
+        self.train_imagefs = list(map(lambda x: os.path.join(image_dir+mode, x), os.listdir(image_dir+mode)))
+        self.transform = transform
+        self.num_images = len(self.train_imagefs)
+        self.mode=mode
+        
+    def __getitem__(self, index):
+        """Return one image and its corresponding attribute label."""
+        if self.mode=='train':
+            random.seed()
+            random.shuffle(self.train_imagefs)
+        #print(index)
+
+        fo = self.train_imagefs[index]
+        imgs=os.listdir(fo)
+        x=[]
+        for item in imgs:
+            x.append(self.transform(Image.open(fo+'/'+item)))
+        x=torch.cat(x, dim=0)
+        
+        return x
+
+    def __len__(self):
+        """Return the number of images."""
+        return self.num_images
+
+def get_loader(m,image_dir, attr_path, selected_attrs, crop_size=178, image_size=128, 
                batch_size=16, dataset='CelebA', mode='train', num_workers=1):
     """Build and return a data loader."""
     transform = []
-
-    if mode == 'train':
-        transform.append(T.RandomHorizontalFlip())
-    transform.append(T.CenterCrop(crop_size))
-    transform.append(T.Resize(image_size))
     transform.append(T.ToTensor())
     #transform.append(T.Normalize(mean=[0.5], std=[0.5]))
     transform = T.Compose(transform)
@@ -64,7 +92,10 @@ def get_loader(image_dir, attr_path, selected_attrs, crop_size=178, image_size=1
     if dataset == 'CelebA':
         dataset = CelebA(image_dir, attr_path, selected_attrs, transform, mode)
     elif dataset == 'RaFD':
-        dataset = ImageFolder(image_dir, transform,mode)
+        if m==10:
+            dataset = ImageFolder1(image_dir, transform,mode)
+        else:
+            dataset = ImageFolder(image_dir, transform,mode)
     
     data_loader = data.DataLoader(dataset=dataset,
                                   batch_size=batch_size,
